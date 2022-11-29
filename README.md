@@ -1,5 +1,13 @@
 # NextJS
 
+## Homework
+
+Incorporate images into the project.
+
+## Exercise
+
+Scaffold a NextJS project:
+
 <!-- https://www.mongodb.com/developer/languages/javascript/nextjs-with-mongodb/ -->
 
 `npx create-next-app@latest next-project`
@@ -128,6 +136,29 @@ const PokemonInfo = ({ name: { english }, base }) => (
 );
 ```
 
+Note the use of [Object.keys()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/keys) - returns an array of strings of the property names.
+
+An example:
+
+```js
+const base = {
+  HP: 45,
+  Attack: 49,
+  Defense: 49,
+  "Sp. Attack": 65,
+  "Sp. Defense": 65,
+  Speed: 45,
+};
+
+let objKeys = Object.keys(base).map((key) => {
+  return `${key} : ${base[key]}`;
+});
+
+console.log(objKeys);
+```
+
+Compare [Object.values()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/values) and [Object.entries()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/entries).
+
 Add `selectedPokemon` state to the Pokemon component and compose the new `PokemonInfo` component.
 
 ```js
@@ -172,11 +203,45 @@ export default function Pokemon() {
 
 Test the button.
 
-That's a lot of pokemon. We will restrict the number and allow the user to filter them.
+That's a lot of pokemon. We will restrict the number and then allow the user to filter them.
+
+## Restrict
+
+`Array.slice()` returns an array:
+
+```js
+<tbody>
+  {pokemon.slice(0, 20).map((pokemon) => (
+    <PokemonRow
+      key={pokemon.id}
+      pokemon={pokemon}
+      onClick={(pokemon) => selectedPokemonSet(pokemon)}
+    />
+  ))}
+</tbody>
+```
 
 ## Filter Pokemon
 
-We will add a new `filter` state, an input field, and then use the filtered data as the source of displayed pokemon.
+We will add a new `filter` state and setter, an input field, and then use the filtered data as the source of displayed pokemon.
+
+```js
+const [filter, filterSet] = React.useState("");
+...
+<input
+type="text"
+value={filter}
+onChange={(event) => filterSet(event.target.value)}
+/>
+...
+.filter((pokemon) =>
+pokemon.name.english
+  .toLowerCase()
+  .includes(filter.toLowerCase())
+)
+```
+
+Here's the end result:
 
 ```js
 export default function Pokemon() {
@@ -236,6 +301,8 @@ Note the use of [toLocaleLowerCase](https://developer.mozilla.org/en-US/docs/Web
 ## Material UI
 
 We will use [Material UI](https://mui.com) as a source of ready made components.
+
+[Install](https://mui.com/material-ui/getting-started/installation/) Material UI:
 
 `npm install @mui/material @emotion/react @emotion/styled`
 
