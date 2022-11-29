@@ -12,9 +12,7 @@
 
 <!-- Note: environment variables are read only on start up. When changing env files restart the app if running. -->
 
-Note: running `start` in a NextJS app runs from the production build folder. Use:
-
-`npm run dev`
+Note: running `start` in a NextJS app runs from the production build folder. Use `npm run dev` instead.
 
 Things to note:
 
@@ -282,6 +280,27 @@ import { Button, TextField } from "@mui/material";
  />
 ```
 
+At this point, depending on your light/dark system appearance preferences, they may be display issues.
+
+Try importing the theme provider and setting the mode to either [dark or light](https://mui.com/material-ui/customization/dark-mode/#dark-mode-by-default):
+
+```js
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+
+const darkTheme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+});
+
+...
+
+  return (
+    <ThemeProvider theme={darkTheme}>
+    ...
+    </ThemeProvider>
+```
+
 ## Styled Components
 
 MUI uses [Emotion](https://emotion.sh/docs/introduction) internally. Emotion is similar to Styled Components and can be used without MUI.
@@ -289,9 +308,7 @@ MUI uses [Emotion](https://emotion.sh/docs/introduction) internally. Emotion is 
 MUI offers page layout tools but we will use Emotion instead.
 
 ```js
-import React from "react";
 import styled from "@emotion/styled";
-import { Button } from "@mui/material";
 
 // ...
 
@@ -308,7 +325,7 @@ const TwoColumnLayout = styled.div`
   grid-template-columns: 80% 20%;
   grid-column-gap: 1rem;
 `;
-const Input = styled.input`
+const StyledTextField = styled(TextField)`
   width: 100%;
   padding: 0.2rem;
   font-size: large;
@@ -335,7 +352,7 @@ export default function Pokemon() {
       <Title>Pokemon Search</Title>
       <TwoColumnLayout>
         <div>
-          <TextField
+          <StyledTextField
             variant="standard"
             type="search"
             value={filter}
@@ -368,6 +385,8 @@ export default function Pokemon() {
 }
 ```
 
+Note the syntax for the `StyledTextField` component.
+
 ## Navigation
 
 Create a Nav component `components/nav.js`:
@@ -392,15 +411,45 @@ export default function Nav() {
 }
 ```
 
-Import and compose it in `pokemon.js`.
+Import and compose it in `_document.js`. Note the page refresh. This is obviously incorrect. We need to create a [layout](https://nextjs.org/docs/basic-features/layouts):
 
-Update it to use MUI following [this formula](https://mui.com/material-ui/react-app-bar/):
+```js
+// components/layout.js
+
+import Nav from "./nav";
+
+export default function Layout({ children }) {
+  return (
+    <>
+      <Nav />
+      <main>{children}</main>
+    </>
+  );
+}
+```
+
+And compose it in `_app.js`:
+
+```js
+import "../styles/globals.css";
+import type { AppProps } from "next/app";
+import Layout from "../components/layout";
+
+export default function App({ Component, pageProps }: AppProps) {
+  return (
+    <Layout>
+      <Component {...pageProps} />
+    </Layout>
+  );
+}
+```
+
+Update Nav to use MUI following [this formula](https://mui.com/material-ui/react-app-bar/):
 
 ```js
 import Link from "next/link";
 import styled from "@emotion/styled";
 
-import * as React from "react";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Toolbar from "@mui/material/Toolbar";
@@ -442,22 +491,15 @@ export default function Nav() {
 }
 ```
 
-Note: we'll need it install `@mui/icons-material`.
-
-Import it and compose it in all pages. e.g.:
-
-```js
-  return (
-    <>
-      <Nav />
-      <PageContainer>
-```
+Note: we'll need it install `@mui/icons-material` for the above.
 
 ## NextJS Dynamic Routes
 
 [NextJS Dynamic Routes](https://nextjs.org/docs/routing/dynamic-routes) are routing utilities for creating pages that use parameters.
 
-Create `components/PokemonRow.js`
+We'll use them to display one page per pokemon.
+
+Create `components/PokemonRow.js` and move the component from `pokemon.js`:
 
 ```js
 import { Button } from "@mui/material";
@@ -481,7 +523,7 @@ export const PokemonRow = ({ pokemon, onClick }) => (
 );
 ```
 
-And import it into pokemon:
+Re-compose it into pokemon with:
 
 ```js
 import { PokemonRow } from "../components/PokemonRow";
@@ -496,6 +538,7 @@ import Link from "next/link";
 export const PokemonRow = ({ pokemon, onClick }) => (
   <>
     <tr key={pokemon.id}>
+      {/* HERE */}
       <td>
         <Link href={`/pokemon/${pokemon.id}`}>{pokemon.name.english}</Link>
       </td>
@@ -534,29 +577,13 @@ export default function SinglePokemon({ pokemon }) {
 }
 ```
 
-ALT
-
-```js
-import { useRouter } from "next/router";
-
-import styled from "@emotion/styled";
-
-const PageContainer = styled.div`
-  margin: auto;
-  width: 800px;
-  padding-top: 1em;
-`;
-
-export default function Post({ pokemon }) {
-  const router = useRouter();
-
-  return <PageContainer>{router.query.id}</PageContainer>;
-}
-```
+Test the links.
 
 When the app sees a url such as `/pokemon/2` it will map the number to query parameter called id and invoke this page.
 
 We need to make the pokemon collection available to this component in order to filter on them and display the info for a single Pokemon.
+
+We will use React Context.
 
 ## Context
 
@@ -578,9 +605,10 @@ Import it into the pokemon page:
 import PokemonContext from "../src/PokemonContext";
 ```
 
-and enclose entire component with the Context.Provider method:
+And enclose the entire component with the Context.Provider method:
 
 ```js
+// prettier-ignore
 return (
   <PokemonContext.Provider
     value={{
@@ -595,7 +623,9 @@ return (
     <PageContainer>
       <CssBaseline />
       <Title>Pokemon Search</Title>
-      <TwoColumnLayout>...</TwoColumnLayout>
+      <TwoColumnLayout>
+         ...
+      </TwoColumnLayout>
     </PageContainer>
   </PokemonContext.Provider>
 );
@@ -608,14 +638,21 @@ Create `components/PokemonFilter.jsx`:
 ```js
 import React, { useContext } from "react";
 import { TextField } from "@mui/material";
-
+import styled from "@emotion/styled";
 import PokemonContext from "../src/PokemonContext";
+
+const StyledTextField = styled(TextField)`
+  width: 100%;
+  padding: 0.2rem;
+  font-size: large;
+  margin: 2rem 0;
+`;
 
 export const PokemonFilter = () => {
   const { filter, filterSet } = useContext(PokemonContext);
 
   return (
-    <TextField
+    <StyledTextField
       variant="standard"
       type="search"
       value={filter}
@@ -626,30 +663,18 @@ export const PokemonFilter = () => {
 };
 ```
 
-And compose it:
+And compose it in `pokemon.js`:
 
 ```js
 import { PokemonFilter } from "../components/PokemonFilter";
 ```
 
 ```js
+// prettier-ignore
 <div>
   <PokemonFilter />
   <table width="100%">
-    <tbody>
-      {pokemon
-        .filter(({ name: { english } }) =>
-          english.toLocaleLowerCase().includes(filter.toLocaleLowerCase())
-        )
-        .slice(0, 20)
-        .map((pokemon) => (
-          <PokemonRow
-            key={pokemon.id}
-            pokemon={pokemon}
-            onClick={(pokemon) => selectedPokemonSet(pokemon)}
-          />
-        ))}
-    </tbody>
+    ...
   </table>
 </div>
 ```
@@ -660,14 +685,18 @@ This works for PokemonFilter but not for `[id].js` because it is a page, not a c
 
 Since NextJS follows a different paradigm and structures the application into individual pages, there is no `index.js` like what we saw in the Create React App. It has been abstracted away.
 
-The work around for this is to create a [custom app](https://nextjs.org/docs/advanced-features/custom-app): `pages/_app.jsx`
+The work around for this is to use the [custom app](https://nextjs.org/docs/advanced-features/custom-app) in `pages/_app.jsx`
 
 ```js
 import React from "react";
+import "../styles/globals.css";
+import type { AppProps } from "next/app";
+import Layout from "../components/layout";
 import PokemonContext from "../src/PokemonContext";
 
-export default function MyApp({ Component, pageProps }) {
+export default function App({ Component, pageProps }: AppProps) {
   const [pokemon, pokemonSet] = React.useState([]);
+
   React.useEffect(() => {
     fetch("/pokemon.json")
       .then((resp) => resp.json())
@@ -681,7 +710,9 @@ export default function MyApp({ Component, pageProps }) {
         pokemonSet,
       }}
     >
-      <Component {...pageProps} />
+      <Layout>
+        <Component {...pageProps} />
+      </Layout>
     </PokemonContext.Provider>
   );
 }
@@ -721,8 +752,8 @@ const { pokemon, pokemonSet } = useContext(PokemonContext);
 Ensure we can see the pokemon collection in `[id].js`:
 
 ```js
-import { useContext } from "react";
 import { useRouter } from "next/router";
+import { useContext } from "react";
 import PokemonContext from "../../src/PokemonContext";
 import styled from "@emotion/styled";
 
@@ -738,7 +769,7 @@ export default function SinglePokemon() {
 
   return (
     <PageContainer>
-      {JSON.stringify(pokemon[router.query.id], null, 2)}
+      <pre>{JSON.stringify(pokemon[router.query.id], null, 2)}</pre>
     </PageContainer>
   );
 }
@@ -845,7 +876,7 @@ const darkTheme = createTheme({
   },
 });
 
-export default function MyApp({ Component, pageProps }) {
+export default function App({ Component, pageProps }) {
   const [pokemon, pokemonSet] = React.useState([]);
   const [filter, filterSet] = React.useState("");
   React.useEffect(() => {
@@ -872,9 +903,18 @@ export default function MyApp({ Component, pageProps }) {
 }
 ```
 
+```js
+export default function Pokemon() {
+  // const [filter, filterSet] = React.useState("");
+  // const [pokemon, pokemonSet] = React.useState(null);
+  const { pokemon, pokemonSet, filter, filterSet } = useContext(PokemonContext);
+```
+
 ## Server Side Rendering
 
-Save `pokemon.js` as `server-side-pokemon.js` into the pages folder`.
+<!-- Save `pokemon.js` as `server-side-pokemon.js` into the pages folder`. -->
+
+Save and commit all files. Create a new branch.
 
 In a SPA the page is rendered on the client (browser). In SSR the page is generated on the server when the server gets a request. This allows for superior search engine optimization.
 
@@ -1159,7 +1199,7 @@ export const PokemonFilter = ({ filter, filterSet }) => {
 };
 ```
 
-And in pokemon.sj:
+And in pokemon.js:
 
 ```js
 <PokemonFilter filter={filter} filterSet={filterSet} />
@@ -1214,7 +1254,7 @@ const TwoColumnLayout = styled.div`
 export default function Pokemon() {
   const [filter, filterSet] = React.useState("");
   // const { pokemon, pokemonSet } = useContext(PokemonContext);
-  const [pokemon, pokemonSet] = useState(allpokemon);
+  const [pokemon, pokemonSet] = React.useState(allpokemon);
   const [selectedPokemon, selectedPokemonSet] = React.useState(null);
 
   if (!pokemon) {
@@ -1222,16 +1262,6 @@ export default function Pokemon() {
   }
 
   return (
-    // <PokemonContext.Provider
-    //   value={{
-    //     filter,
-    //     pokemon,
-    //     filterSet,
-    //     pokemonSet,
-    //     selectedPokemon,
-    //     selectedPokemonSet,
-    //   }}
-    // >
     <PageContainer>
       <CssBaseline />
       <Title>Pokemon Search</Title>
@@ -1260,7 +1290,6 @@ export default function Pokemon() {
         {selectedPokemon && <PokemonInfo {...selectedPokemon} />}
       </TwoColumnLayout>
     </PageContainer>
-    // </PokemonContext.Provider>
   );
 }
 ```
