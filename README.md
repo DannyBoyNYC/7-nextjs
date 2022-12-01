@@ -1380,3 +1380,158 @@ Create an export script in package.json:
 cd into the new `out` directory and run:
 
 `PORT=6789 npx serve`
+
+## API
+
+<!-- https://itnext.io/using-mongoose-with-next-js-11-b2a08ff2dd3c -->
+
+https://github.com/vercel/next.js/tree/canary/examples/with-mongodb-mongoose
+
+Compass
+
+https://www.mongodb.com/try/download/compass
+
+npm install
+
+```js
+npm i mongodb mongoose
+```
+
+.env.local:
+
+lib/dbConnect.js:
+
+```js
+import mongoose from "mongoose";
+
+/** 
+Source : 
+https://github.com/vercel/next.js/tree/canary/examples/with-mongodb-mongoose
+**/
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  throw new Error(
+    "Please define the MONGODB_URI environment variable inside .env.local"
+  );
+}
+/**
+ * Global is used here to maintain a cached connection across hot reloads
+ * in development. This prevents connections growing exponentially
+ * during API Route usage.
+ */
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function dbConnect() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    const opts = {
+      useNewUrlParser: true,
+    };
+
+    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+      return mongoose;
+    });
+  }
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
+
+export default dbConnect;
+```
+
+models/user.js
+
+```js
+import mongoose from "mongoose";
+
+const UserSchema = new mongoose.Schema({
+  name: String,
+  email: String,
+});
+
+module.exports = mongoose.models.User || mongoose.model("User", UserSchema);
+```
+
+pages/api/users.js
+
+```js
+import dbConnect from "../../lib/dbConnect";
+import User from "../../models/User";
+
+export default async function handler(req, res) {
+  const { method } = req;
+
+  await dbConnect();
+
+  switch (method) {
+    case "GET":
+      try {
+        const users = await User.find({});
+        res.status(200).json({ success: true, data: users });
+      } catch (error) {
+        res.status(400).json({ success: false });
+      }
+      break;
+    case "POST":
+      try {
+        const user = await User.create(req.body);
+        res.status(201).json({ success: true, data: user });
+      } catch (error) {
+        res.status(400).json({ success: false });
+      }
+      break;
+    default:
+      res.status(400).json({ success: false });
+      break;
+  }
+}
+```
+
+Postman:
+
+`GET http://localhost:3000/api/users`
+`POST http://localhost:3000/api/users`
+
+```
+curl --request POST \
+  --url http://localhost:3000/api/users \
+  --header 'Content-Type: application/json' \
+  --data '{
+ "name": "John Doe",
+ "email": "john@doe.com"
+}'
+```
+
+View the users on index.js:
+
+```js
+export default function Home({ isConnected }) {
+  const [users, setUsers] = React.useState([]);
+
+  React.useEffect(() => {
+    getAsyncUsers();
+  }, []);
+
+  async function getAsyncUsers() {
+    const response = await fetch("http://localhost:3001/api/users");
+    const data = await response.json();
+    console.log(data);
+    setUsers(data.data);
+  }
+
+  ...
+
+  <ul>
+    {users.map((user) => (
+      <li key={user._id}>{user.name}</li>
+    ))}
+  </ul>
+```
